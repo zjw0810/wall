@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 爱的表白墙</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(900px 600px at 20% 10%, rgba(238,124,146,.35), transparent 60%),
+    radial-gradient(800px 550px at 85% 90%, rgba(206,122,188,.25), transparent 60%),
+    linear-gradient(160deg,#F5D5D8 0%,#F0DCE0 50%,#E8E0F0 100%);
+  color:#8A4A58; padding:20px;
+}
+.card{
+  width:100%; max-width:400px; background:rgba(255,255,255,0.92);
+  border-radius:22px; padding:40px 34px 34px;
+  box-shadow:0 20px 60px rgba(160,90,110,0.25);
+  text-align:center;
+}
+.card h1{font-size:24px; font-weight:700; letter-spacing:2px; margin-bottom:6px; color:#C4557A;}
+.card .sub{font-size:13px; color:#B09098; margin-bottom:28px; letter-spacing:1px;}
+.field{text-align:left; margin-bottom:16px;}
+.field label{display:block; font-size:13px; margin-bottom:6px; color:#8A5A66;}
+.field input{
+  width:100%; padding:13px 16px; border-radius:12px;
+  border:1.5px solid #EBC8D2; background:#fff; font-size:15px; outline:none;
+  color:#4A2A32; transition:border-color .2s;
+}
+.field input:focus{border-color:#D97A9B;}
+.btn{
+  width:100%; margin-top:8px; padding:15px; border:none; border-radius:50px;
+  background:linear-gradient(135deg,#E898A8,#D06A8A); color:#fff;
+  font-size:16px; font-weight:700; letter-spacing:4px; cursor:pointer;
+  box-shadow:0 8px 22px rgba(208,106,138,0.35); transition:transform .2s;
+}
+.btn:hover{transform:translateY(-2px);}
+.btn:active{transform:none;}
+.err{
+  min-height:20px; margin-top:14px; font-size:13.5px; color:#C0392B; line-height:1.6;
+}
+.foot{margin-top:22px; font-size:12px; color:#B09098;}
+.foot a{color:#C4557A; text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>爱的表白墙 · 后台登录</h1>
+  <div class="sub">六味情书 · 爱的表白墙</div>
+  <div class="field">
+    <label>账号</label>
+    <input id="user" placeholder="请输入账号" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>密码</label>
+    <input id="pass" type="password" placeholder="请输入密码" autocomplete="current-password">
+  </div>
+  <button class="btn" onclick="doLogin()">登 录</button>
+  <div class="err" id="err"></div>
+  <div class="foot"><a href="./">← 返回收集页</a></div>
+</div>
+
+<script>
+async function doLogin(){
+  const user = document.getElementById('user').value.trim();
+  const pass = document.getElementById('pass').value;
+  const err = document.getElementById('err');
+  if(!user || !pass){ err.textContent = '请输入账号和密码'; return; }
+  err.textContent = '登录中…';
+  try{
+    const r = await fetch('api/login' + (location.search || '').replace(/[?&]next=[^&]*/,''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: user, pass: pass })
+    });
+    if(r.ok){
+      const next = new URLSearchParams(location.search).get('next') || 'admin.html';
+      location.href = next;
+      return;
+    }
+    let msg = '登录失败';
+    try { const j = await r.json(); if(j && j.msg) msg = j.msg; } catch(e){}
+    err.textContent = msg;
+  }catch(e){
+    err.textContent = '网络异常,请重试';
+  }
+}
+document.getElementById('pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('user').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>

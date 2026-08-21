@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>后台管理 · 六味情书表白墙</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f6f1f2;color:#3a2a2a;padding:30px 20px 60px;}
+.wrap{max-width:920px;margin:0 auto;}
+h1{font-size:24px;color:#C47B7F;margin-bottom:6px;}
+.sub{font-size:13px;color:#999;margin-bottom:20px;}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+.btn{border:none;padding:10px 18px;border-radius:10px;font-size:14px;cursor:pointer;background:#C47B7F;color:#fff;transition:.2s;}
+.btn:hover{background:#b06a6e;}
+.btn.ghost{background:#fff;border:1px solid #ddd;color:#666;}
+.btn.ghost:hover{background:#f0e8e9;}
+.stat{font-size:14px;color:#888;margin-left:auto;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.chip{padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;background:#fff;border:1px solid #e5dada;color:#888;transition:.2s;}
+.chip.on{background:#C47B7F;color:#fff;border-color:#C47B7F;}
+.list{display:grid;gap:12px;}
+.card{border-radius:14px;padding:18px 20px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.06);border-left:5px solid #ccc;}
+.card .meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;color:#999;}
+.card .flavor{font-weight:600;padding:2px 10px;border-radius:12px;font-size:12px;color:#fff;}
+.card .text{font-size:16px;line-height:1.8;color:#3a2a2a;white-space:pre-wrap;word-break:break-word;}
+.card .meta-left{display:flex;align-items:center;gap:8px;}
+.pbadge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;white-space:nowrap;}
+.pbadge.pend{background:#FFF1E6;color:#E67E22;border:1px solid #F5CBA7;}
+.pbadge.ok{background:#E9F7EE;color:#27AE60;border:1px solid #ABE0BC;}
+.card .actions{display:flex;align-items:center;gap:6px;margin-top:12px;}
+.approve-btn{font-size:12px;color:#27AE60;cursor:pointer;border:1px solid #ABE0BC;background:#E9F7EE;padding:4px 13px;border-radius:20px;transition:.2s;}
+.approve-btn:hover{background:#D3EEDC;}
+.card .del{font-size:12px;color:#c99;cursor:pointer;border:none;background:none;text-decoration:underline;}
+.card .del:hover{color:#c0392b;}
+.empty{text-align:center;padding:60px 20px;color:#bbb;font-size:15px;}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:#3a2a2a;color:#fff;padding:12px 24px;border-radius:30px;font-size:14px;z-index:50;transition:transform .4s cubic-bezier(.34,1.56,.64,1);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>六味情书 · 后台管理</h1>
+  <div class="sub">六味情书 · 爱的表白墙 — 查看 / 审核 / 删除提交的表白</div>
+
+  <div class="bar">
+    <button class="btn" onclick="refresh()">↻ 刷新</button>
+    <button class="btn ghost" onclick="goto('screen.html')">🖥️ 打开大屏弹幕</button>
+    <button class="btn ghost" onclick="goto('confession-wall-step1.html')">＋ 收集页</button>
+    <button class="btn ghost" onclick="logout()">⏻ 退出登录</button>
+    <span class="stat" id="stat">共 0 条</span>
+  </div>
+
+  <div class="filters" id="statusFilters">
+    <div class="chip on" data-s="pending">⏳ 待审核</div>
+    <div class="chip" data-s="approved">✅ 已通过</div>
+    <div class="chip" data-s="all">全部</div>
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="chip on" data-f="all">全部味道</div>
+    <div class="chip" data-f="zhizi">胭脂粉</div>
+    <div class="chip" data-f="yuebai">月华白</div>
+    <div class="chip" data-f="qiuyang">秋阳金</div>
+    <div class="chip" data-f="mushan">暮山紫</div>
+    <div class="chip" data-f="shanlan">山岚绿</div>
+    <div class="chip" data-f="hupo">琥珀褐</div>
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const FLAVORS={
+  zhizi:{name:'胭脂粉',bg:'#E898A8'},
+  yuebai:{name:'月华白',bg:'#D8D0C8'},
+  qiuyang:{name:'秋阳金',bg:'#E8BC78'},
+  mushan:{name:'暮山紫',bg:'#C8B8D8'},
+  shanlan:{name:'山岚绿',bg:'#98C4B0'},
+  hupo:{name:'琥珀褐',bg:'#D0B898'}
+};
+let data=[]; let filter='all'; let statusFilter='pending';
+
+/* 携带查询参数跳转/请求 */
+function goto(path){ location.href = path + (location.search||''); }
+function apiUrl(path){
+  var q = location.search || '';
+  if(!q) return path;
+  return path + (path.indexOf('?') >= 0 ? '&' : '?') + q.slice(1);
+}
+
+async function refresh(){
+  try{
+    const r=await fetch(apiUrl('api/confess'));
+    data = r.ok ? await r.json() : [];
+  }catch(e){ data=[]; }
+  render();
+}
+function fmt(t){ const d=new Date(t); const p=n=>String(n).padStart(2,'0'); return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function render(){
+  const pending = data.filter(x=>(x.status||'approved')==='pending').length;
+  document.getElementById('stat').textContent='共 '+data.length+' 条 · 待审核 '+pending+' · 已通过 '+(data.length-pending);
+  const list=document.getElementById('list');
+  const shown = data.filter(x=>
+    (filter==='all' || x.flavor===filter) &&
+    (statusFilter==='all' || (x.status||'approved')===statusFilter)
+  );
+  if(!shown.length){ list.innerHTML=`<div class="empty">暂无表白</div>`; return; }
+  list.innerHTML = shown.slice().reverse().map(it=>{
+    const F=FLAVORS[it.flavor]||FLAVORS.zhizi;
+    const ok = (it.status||'approved')==='approved';
+    const badge = ok
+      ? '<span class="pbadge ok">已通过</span>'
+      : '<span class="pbadge pend">待审核</span>';
+    const approveBtn = ok ? '' : `<button class="approve-btn" onclick="approve('${it.id}')">✅ 通过审核</button>`;
+    return `<div class="card" style="border-left-color:${F.bg}">
+      <div class="meta">
+        <div class="meta-left"><span class="flavor" style="background:${F.bg}">${F.name}</span>${badge}</div>
+        <span>${escapeHtml(it.name||'匿名')} · ${fmt(it.time)}</span>
+      </div>
+      <div class="text">${escapeHtml(it.text||'')}</div>
+      <div class="actions">${approveBtn}<button class="del" onclick="del('${it.id}')">删除这条</button></div>
+    </div>`;
+  }).join('');
+}
+async function del(id){
+  if(!confirm('确定删除这条表白？')) return;
+  const r=await fetch(apiUrl('api/confess?id='+id),{method:'DELETE'});
+  if(r.ok){ toast('已删除'); refresh(); }
+  else toast('删除失败');
+}
+async function approve(id){
+  const r=await fetch(apiUrl('api/confess?id='+id),{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'approved'})
+  });
+  if(r.ok){ toast('✅ 已通过，即将上大屏'); refresh(); }
+  else { let m='操作失败'; try{const j=await r.json(); if(j&&j.msg)m=j.msg;}catch(e){} toast(m); }
+}
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+async function logout(){
+  try { await fetch(apiUrl('api/logout'), { method: 'POST' }); } catch(e){}
+  location.href = 'login.html';
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.getElementById('filters').addEventListener('click',e=>{
+  if(!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#filters .chip').forEach(c=>c.classList.remove('on'));
+  e.target.classList.add('on');
+  filter=e.target.dataset.f; render();
+});
+
+document.getElementById('statusFilters').addEventListener('click',e=>{
+  if(!e.target.classList.contains('chip')) return;
+  document.querySelectorAll('#statusFilters .chip').forEach(c=>c.classList.remove('on'));
+  e.target.classList.add('on');
+  statusFilter=e.target.dataset.s; render();
+});
+
+refresh();
+</script>
+</body>
+</html>

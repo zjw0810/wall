@@ -1,0 +1,12 @@
+{
+  "name": "confession-wall",
+  "version": "1.0.0",
+  "description": "六味情书 · 互动表白墙后端（H5 收集 + 审核 + LED 弹幕大屏）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

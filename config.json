@@ -1,0 +1,9 @@
+{
+  "users": [
+    {
+      "user": "admin",
+      "passHash": "1d595661c135ad3597e0cc25edf4bd0a4d04b683aa8f08d45f0eba7f127875fa"
+    }
+  ],
+  "passHint": "默认密码 liuwei888，上线前请务必修改（生成方法见 README）"
+}

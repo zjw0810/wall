@@ -1,0 +1,12 @@
+data/
+*.zip
+cloud-server-b64.txt
+node_modules/
+.npm-cache/
+tunnel-tools/
+tmp_*.js
+tmp_*.mjs
+.DS_Store
+.deploy/
+项目归档/
+*.bak.*

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>爱的表白墙 · 弹幕大屏</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+:root{ --mscale:0.6; }
+body{
+  font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:#F5D5D8;
+  color:#7a3b46; overflow:hidden;
+}
+
+/* ===== Floating hearts background ===== */
+.hearts{position:fixed; inset:0; z-index:1; pointer-events:none;}
+.heart{
+  position:absolute; bottom:-9vh; opacity:0; will-change:transform,opacity;
+  animation:rise linear infinite;
+  text-shadow:0 0 14px rgba(255,110,150,.55);
+}
+@keyframes rise{
+  0%{ transform:translateY(0) rotate(-10deg) scale(.75); opacity:0; }
+  10%{ opacity:var(--o,.65); }
+  85%{ opacity:var(--o,.65); }
+  100%{ transform:translateY(-118vh) rotate(12deg) scale(1.18); opacity:0; }
+}
+.paused .heart{animation-play-state:paused;}
+
+/* ===== Danmaku stage ===== */
+.dm-wrap{position:fixed; inset:0; z-index:2; overflow:hidden;}
+.dm{
+  position:absolute; left:100vw; top:var(--y,40px);
+  display:inline-flex; align-items:center; gap:10px;
+  padding:10px 20px 10px 11px; border-radius:999px;
+  background:linear-gradient(90deg, rgba(255,255,255,.92), rgba(255,236,240,.85));
+  border:1.5px solid rgba(196,123,127,.35);
+  box-shadow:0 8px 28px rgba(160,90,110,.25);
+  backdrop-filter:blur(8px); white-space:nowrap; will-change:transform;
+}
+.paused .dm{animation-play-state:paused !important;}
+@keyframes dmMove{ from{transform:translateX(0);} to{transform:translateX(calc(-100vw - 100%));} }
+.dm .ava{
+  width:36px; height:36px; border-radius:50%; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:700; color:#fff;
+  box-shadow:0 2px 8px rgba(160,90,110,.25);
+}
+.dm .new-tag{
+  flex:none; font-size:11px; font-weight:700; letter-spacing:1px;
+  background:linear-gradient(135deg,#FF6B9A,#FF8FB0); color:#fff;
+  padding:2px 8px; border-radius:16px; animation:tagPulse 1.4s ease-in-out infinite;
+}
+@keyframes tagPulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.12);} }
+.dm .name{font-weight:700; font-size:16px; letter-spacing:1px; flex:none; text-shadow:0 1px 3px rgba(255,255,255,.6);}
+.dm .sep{opacity:.4; font-size:14px; flex:none;}
+.dm .txt{
+  font-size:18px; line-height:1.5; color:#7a3b46; font-weight:600;
+  letter-spacing:.5px;
+}
+.dm .hearts-tail{font-size:17px; flex:none;}
+.dm .hearts-tail span{display:inline-block; animation:beat 1.6s ease-in-out infinite;}
+.dm .hearts-tail span:nth-child(2){animation-delay:.25s;}
+.dm .hearts-tail span:nth-child(3){animation-delay:.5s;}
+@keyframes beat{ 0%,100%{transform:scale(1);} 30%{transform:scale(1.3);} 60%{transform:scale(1);} }
+
+/* ===== Top brand bar ===== */
+.top-brand{
+  position:fixed; top:0; left:0; right:0; z-index:5;
+  display:flex; align-items:center; justify-content:flex-end;
+  padding:26px 40px; pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,0.45), transparent);
+}
+.top-brand .right{font-size:14px; opacity:.6;}
+
+/* ===== QR box (right-middle-upper, always visible) ===== */
+.qr-box{
+  position:fixed; right:30px; top:calc(30% - 150px); z-index:6;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  background:rgba(255,255,255,0.97); border-radius:14px; padding:10px 14px 9px;
+  box-shadow:0 10px 32px rgba(160,90,110,0.28);
+}
+.qr-box svg{display:block; width:150px; height:150px;}
+.qr-box .qr-t{font-size:12px; color:#B0506A; font-weight:700; letter-spacing:1px; white-space:nowrap;}
+
+/* ===== Empty state ===== */
+.empty{
+  position:fixed; inset:0; z-index:4; display:none;
+  align-items:center; justify-content:center; text-align:center;
+}
+.empty.show{display:flex;}
+.empty .inner{max-width:620px; padding:40px;}
+.empty h2{font-size:32px; font-weight:700; margin-bottom:18px; color:#C44763;}
+.empty p{font-size:17px; line-height:2; opacity:.75; margin-bottom:10px;}
+.empty a{color:#C44763; text-decoration:underline;}
+
+/* ===== Controls ===== */
+.controls{
+  position:fixed; bottom:0; left:0; right:0; z-index:6;
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  padding:22px; pointer-events:none;
+  background:linear-gradient(0deg, rgba(255,255,255,0.55), transparent);
+  transition:opacity .4s;
+}
+.controls.hide{opacity:0;}
+.ctrl-btn{
+  pointer-events:auto; cursor:pointer;
+  background:rgba(255,255,255,0.72); border:1px solid rgba(196,123,127,0.35);
+  color:#7a3b46; padding:11px 20px; border-radius:30px; font-size:14px;
+  backdrop-filter:blur(6px); transition:background .2s; user-select:none;
+}
+.ctrl-btn:hover{background:rgba(255,255,255,0.92);}
+.ctrl-count{font-size:14px; opacity:.7; min-width:110px; text-align:center;}
+
+/* ===== 超大屏模式（3:1 广场屏 如 3600×1200）===== */
+body.mega .top-brand{padding:56px 84px;}
+body.mega .top-brand .right{font-size:32px;}
+body.mega .dm{gap:calc(26px*var(--mscale)); padding:calc(26px*var(--mscale)) calc(56px*var(--mscale)) calc(26px*var(--mscale)) calc(30px*var(--mscale)); border-width:calc(3px*var(--mscale)); border-radius:999px;}
+body.mega .dm .ava{width:calc(112px*var(--mscale)); height:calc(112px*var(--mscale)); font-size:calc(50px*var(--mscale));}
+body.mega .dm .new-tag{font-size:calc(30px*var(--mscale)); padding:calc(8px*var(--mscale)) calc(22px*var(--mscale)); border-radius:calc(34px*var(--mscale));}
+body.mega .dm .name{font-size:calc(52px*var(--mscale));}
+body.mega .dm .sep{font-size:calc(42px*var(--mscale));}
+body.mega .dm .txt{font-size:calc(60px*var(--mscale)); font-weight:600;}
+body.mega .dm .hearts-tail{font-size:calc(54px*var(--mscale));}
+body.mega .qr-box{right:60px; top:calc(30% - 150px); border-radius:28px; padding:22px 28px 20px; gap:12px;}
+body.mega .qr-box svg{width:360px; height:360px;}
+body.mega .qr-box .qr-t{font-size:26px;}
+body.mega .empty .inner{max-width:1400px;}
+body.mega .empty h2{font-size:68px;}
+body.mega .empty p{font-size:36px;}
+body.mega .controls{gap:30px; padding:44px;}
+body.mega .ctrl-btn{font-size:30px; padding:22px 44px; border-radius:60px;}
+body.mega .ctrl-count{font-size:30px; min-width:260px;}
+</style>
+</head>
+<body>
+
+<div class="hearts" id="hearts"></div>
+<div class="dm-wrap" id="dmWrap"></div>
+
+<div class="top-brand" id="topBrand">
+  <div class="right" id="clock"></div>
+</div>
+
+<div class="empty" id="empty">
+  <div class="inner">
+    <h2>表白墙还在等待第一句告白 💌</h2>
+    <p>用手机扫码打开收集页，写下第一句情话吧。</p>
+  </div>
+</div>
+
+<div class="qr-box" id="qrBox">
+  <div id="qrImg"></div>
+  <div class="qr-t">扫码写情话 · 上大屏</div>
+</div>
+
+<div class="controls" id="controls">
+  <div class="ctrl-btn" id="playBtn" onclick="togglePlay()">⏸ 暂停</div>
+  <div class="ctrl-btn" id="speedBtn" onclick="cycleSpeed()">🐢 速度 · 慢</div>
+  <div class="ctrl-count" id="count">已收到 0 条</div>
+  <div class="ctrl-btn" onclick="goto('confession-wall-step1.html')">＋ 去收集</div>
+  <div class="ctrl-btn" onclick="goto('admin.html')">⚙ 后台</div>
+</div>
+
+<script src="qrcode.js"></script>
+<script src="qrcode_UTF8.js"></script>
+<script>
+/* ===== Flavor colors ===== */
+const FLAVORS = {
+  zhizi:  { name:'胭脂粉', color:'#C44763' },
+  yuebai: { name:'月华白', color:'#8E8577' },
+  qiuyang:{ name:'秋阳金', color:'#B8862B' },
+  mushan: { name:'暮山紫', color:'#7A5BA6' },
+  shanlan:{ name:'山岚绿', color:'#3E7D5E' },
+  hupo:   { name:'琥珀褐', color:'#9A6B3A' }
+};
+
+let list = [];              // 全部表白
+let queue = [];             // 待播放队列（id）
+let flying = new Set();     // 正在屏上飞的 id
+let known = new Set();      // 已加载过的 id（用于识别新增）
+let isNew = new Set();      // 新到的 id（首播带 NEW 标）
+let playing = true;
+
+const SPEEDS = [
+  { label:'慢', v:120 },
+  { label:'中', v:200 },
+  { label:'快', v:320 }
+];
+let speedIdx = 0;
+let speed = SPEEDS[speedIdx].v;
+
+/* 超大屏模式：3:1 广场屏（如 3600×1200）自动启用；可用 ?big=1 强制 / ?big=0 关闭 */
+const MEGA = (new URLSearchParams(location.search).get('big') === '1') ||
+             ((new URLSearchParams(location.search).get('big') !== '0') && (window.innerWidth / window.innerHeight) >= 2.5);
+if (MEGA) document.body.classList.add('mega');
+
+const SCALE = Math.min(2, Math.max(0.2, parseFloat(new URLSearchParams(location.search).get('scale')) || 0.6));
+document.documentElement.style.setProperty('--mscale', SCALE);
+const LANE_H = MEGA ? Math.round(220 * SCALE) : 70;  // 每条弹道高度 px
+const TOP_PAD = 50;  // 弹道区顶部留白 50px
+const GAP = MEGA ? Math.round(400 * SCALE) : 90;    // 同弹道前后间隔 px
+let laneBusyUntil = [];
+let laneStep = LANE_H;
+const dmWrap = document.getElementById('dmWrap');
+
+/* ===== Layout lanes ===== */
+function layoutLanes(){
+  const h = dmWrap.clientHeight || window.innerHeight;
+  const n = Math.min(8, Math.max(2, Math.floor((h - TOP_PAD) / LANE_H)));
+  laneStep = (h - TOP_PAD) / n;
+  laneBusyUntil = new Array(n).fill(0);
+}
+window.addEventListener('resize', layoutLanes);
+layoutLanes();
+
+/* ===== Load data ===== */
+async function loadData(){
+  try {
+    const q = location.search || '';
+    const r = await fetch('api/confess?status=approved' + (q ? '&' + q.slice(1) : ''));
+    if (r.ok) { return await r.json(); }
+  } catch(e){}
+  // fallback: localStorage（现场同设备模式）
+  try { return JSON.parse(localStorage.getItem('liuwei_confessions')||'[]'); } catch(e){ return []; }
+}
+
+async function refresh(){
+  const data = await loadData();
+  list = Array.isArray(data) ? data : [];
+  // 新到的表白 → 插到播放队列最前，尽快上屏
+  list.forEach(item=>{
+    if(!known.has(item.id) && !flying.has(item.id) && !queue.includes(item.id)){
+      isNew.add(item.id);
+      queue.unshift(item.id);
+    }
+  });
+  known = new Set(list.map(x=>x.id));
+  // 清理已删除的 id
+  queue = queue.filter(id=>known.has(id));
+  updateCount();
+  updateEmpty();
+  if(!queue.length && list.length) refillQueue();
+}
+
+/* ===== Queue ===== */
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function refillQueue(){
+  const ids = list.map(x=>x.id).filter(id=>!flying.has(id) && !queue.includes(id));
+  shuffle(ids);
+  queue.push(...ids);
+}
+
+/* ===== Spawn danmaku ===== */
+const HEART_TAIL = ['💗','💕','💖','💘','✨'];
+function randTail(){
+  const t = shuffle(HEART_TAIL.slice()).slice(0,2+Math.floor(Math.random()*2));
+  return t.map(h=>`<span>${h}</span>`).join('');
+}
+
+function spawn(item, lane){
+  const F = FLAVORS[item.flavor] || FLAVORS.zhizi;
+  const name = (item.name || '匿名').toString();
+  const firstChar = Array.from(name)[0] || '爱';
+  const el = document.createElement('div');
+  el.className = 'dm';
+  el.style.setProperty('--y', (TOP_PAD + lane*laneStep) + 'px');
+  el.style.borderColor = F.color + '99';
+  el.style.boxShadow = `0 8px 28px rgba(160,90,110,.25), 0 0 22px ${F.color}55`;
+  const newTag = isNew.has(item.id) ? '<span class="new-tag">NEW</span>' : '';
+  isNew.delete(item.id);
+  el.innerHTML = `
+    <span class="ava" style="background:linear-gradient(135deg,${F.color},${F.color}aa); color:#fff;">${escapeHtml(firstChar)}</span>
+    ${newTag}
+    <span class="name" style="color:${F.color}">@${escapeHtml(name)}</span>
+    <span class="sep">💬</span>
+    <span class="txt">${escapeHtml(item.text||'')}</span>
+    <span class="hearts-tail">${randTail()}</span>`;
+  el.style.animation = 'none';
+  dmWrap.appendChild(el);
+  const w = el.offsetWidth;
+  const vw = dmWrap.clientWidth || window.innerWidth;
+  const dur = Math.max(9, (vw + w + GAP) / speed);
+  el.style.animation = `dmMove ${dur}s linear forwards`;
+  laneBusyUntil[lane] = performance.now() + ((w + GAP) / speed) * 1000;
+  flying.add(item.id);
+  el.addEventListener('animationend', ()=>{
+    flying.delete(item.id);
+    el.remove();
+    // 队列空了就循环补货，保证大屏一直有弹幕
+    if(!queue.length && list.length && playing) refillQueue();
+  });
+}
+
+/* ===== Scheduler ===== */
+function tick(){
+  if(!playing || !queue.length) return;
+  const now = performance.now();
+  let lane = -1;
+  for(let i=0;i<laneBusyUntil.length;i++){
+    if(laneBusyUntil[i] <= now){ lane = i; break; }
+  }
+  if(lane === -1) return;           // 所有弹道都忙，下一拍再试
+  const id = queue.shift();
+  const item = list.find(x=>x.id===id);
+  if(!item) return;
+  spawn(item, lane);
+}
+setInterval(tick, 200);
+
+/* ===== Controls ===== */
+function togglePlay(){
+  playing = !playing;
+  document.body.classList.toggle('paused', !playing);
+  document.getElementById('playBtn').textContent = playing ? '⏸ 暂停' : '▶ 播放';
+}
+function cycleSpeed(){
+  speedIdx = (speedIdx+1) % SPEEDS.length;
+  speed = SPEEDS[speedIdx].v;
+  document.getElementById('speedBtn').textContent = '🐢 速度 · ' + SPEEDS[speedIdx].label;
+}
+function updateCount(){
+  document.getElementById('count').textContent = '已收到 ' + list.length + ' 条';
+}
+function updateEmpty(){
+  document.getElementById('empty').classList.toggle('show', list.length === 0);
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ===== Floating hearts background ===== */
+function buildHearts(){
+  const wrap = document.getElementById('hearts');
+  const pool = ['💗','💕','❤️','🩷','💖','💘'];
+  for(let i=0;i<26;i++){
+    const h = document.createElement('span');
+    h.className = 'heart';
+    h.textContent = pool[Math.floor(Math.random()*pool.length)];
+    h.style.left = Math.random()*100 + '%';
+    h.style.fontSize = (MEGA ? (40 + Math.random()*50) : (14 + Math.random()*24)) + 'px';
+    h.style.setProperty('--o', (0.25 + Math.random()*0.45).toFixed(2));
+    h.style.animationDuration = (9 + Math.random()*12) + 's';
+    h.style.animationDelay = (-Math.random()*16) + 's';
+    wrap.appendChild(h);
+  }
+}
+buildHearts();
+
+/* ===== Auto-hide UI for clean projection (top brand stays always) ===== */
+let hideT;
+function scheduleHide(){
+  clearTimeout(hideT);
+  const ui=[document.getElementById('controls')];
+  ui.forEach(e=>e.classList.remove('hide'));
+  hideT=setTimeout(()=>{ if(playing) ui.forEach(e=>e.classList.add('hide')); }, 4000);
+}
+document.addEventListener('mousemove', scheduleHide);
+
+/* ===== 页面跳转（携带查询参数） ===== */
+function goto(path){ location.href = path + (location.search || ''); }
+
+/* ===== QR code (bottom-right → collection page) ===== */
+function buildQR(){
+  let url = '';
+  if(location.origin && location.origin.indexOf('http') === 0){
+    url = location.origin + '/' + (location.search || '');
+  }
+  const imgBox = document.getElementById('qrImg');
+  if(url && typeof qrcode === 'function'){
+    try{
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      // scalable:false 让 SVG 自带 width/height 属性，避免在收缩容器里被算成 0 尺寸
+      imgBox.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: false });
+      imgBox.title = url;
+    }catch(e){
+      imgBox.textContent = '⚠️ 二维码生成失败';
+    }
+  } else {
+    imgBox.textContent = '⚠️ 未检测到访问域名';
+  }
+}
+buildQR();
+
+/* clock */
+function tickClock(){
+  const d=new Date();
+  const p=n=>String(n).padStart(2,'0');
+  document.getElementById('clock').textContent =
+    `${d.getMonth()+1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+setInterval(tickClock,1000); tickClock();
+
+/* keyboard */
+document.addEventListener('keydown',e=>{
+  if(e.key===' '){ e.preventDefault(); togglePlay(); }
+  else if(e.key==='ArrowRight') cycleSpeed();
+  else if(e.key==='ArrowLeft') cycleSpeed();
+  else if(e.key==='Escape') goto('confession-wall-step1.html');
+});
+
+/* ===== Boot ===== */
+(async ()=>{
+  await refresh();
+  refillQueue();
+  scheduleHide();
+  // 轮询间隔（秒）可用 URL 参数控制：screen.html?poll=6 可调快
+  // 默认 15 秒（控制在 Upstash 免费额度内；想更快可用 ?poll=6）
+  const pollSec = Math.min(60, Math.max(3, parseInt(new URLSearchParams(location.search).get('poll')||'15', 10) || 15));
+  setInterval(refresh, pollSec * 1000);
+})();
+</script>
+</body>
+</html>
